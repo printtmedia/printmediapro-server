@@ -9,9 +9,9 @@ const app = express();
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
-// Разрешаем CORS
+// Разрешаем CORS для всех источников (временно для теста)
 app.use(cors({
-    origin: 'https://printtmedia.github.io',
+    origin: '*', // Позже можно вернуть 'https://printtmedia.github.io'
     methods: ['GET', 'POST', 'OPTIONS'],
     allowedHeaders: ['Content-Type'],
     credentials: false
@@ -20,16 +20,19 @@ app.use(cors({
 // Явно обрабатываем OPTIONS запросы
 app.options('*', cors());
 
-// Логируем все входящие запросы для отладки
+// Логируем все входящие запросы
 app.use((req, res, next) => {
-    console.log(`Received ${req.method} request for ${req.url}`);
+    console.log(`Received ${req.method} request for ${req.url} from ${req.headers.origin}`);
+    res.header('Access-Control-Allow-Origin', '*'); // Дополнительно добавляем заголовок
+    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type');
     next();
 });
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Настройка nodemailer (используем Gmail)
+// Настройка nodemailer
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
