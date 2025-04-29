@@ -4,18 +4,27 @@
     {
       "src": "server.js",
       "use": "@vercel/node"
+    },
+    {
+      "src": "api/send-order.js",
+      "use": "@vercel/node"
     }
   ],
   "routes": [
     {
       "src": "/api/test",
       "methods": ["GET"],
-      "dest": "/server.js"
+      "dest": "/server.js",
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type"
+      }
     },
     {
       "src": "/api/send-order",
       "methods": ["OPTIONS"],
-      "dest": "/server.js",
+      "dest": "/api/send-order.js",
       "headers": {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -25,7 +34,7 @@
     {
       "src": "/api/send-order",
       "methods": ["POST"],
-      "dest": "/server.js",
+      "dest": "/api/send-order.js",
       "headers": {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -34,7 +43,12 @@
     },
     {
       "src": "/(.*)",
-      "dest": "/server.js"
+      "dest": "/server.js",
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type"
+      }
     }
   ]
 }
