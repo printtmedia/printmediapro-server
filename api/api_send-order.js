@@ -21,28 +21,32 @@ module.exports = async (req, res) => {
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
     // Логируем запрос
-    console.log(`Received ${req.method} request for ${req.url} from ${req.headers.origin}`);
+    console.log(`Received ${req.method} request for ${req.url} from ${req.headers.origin || 'unknown origin'}`);
 
     // Обработка OPTIONS запросов
     if (req.method === 'OPTIONS') {
+        console.log('Handling OPTIONS request');
         res.status(204).end();
         return;
     }
 
     // Обработка favicon.ico и favicon.png
     if (req.url === '/favicon.ico' || req.url === '/favicon.png') {
+        console.log('Handling favicon request');
         res.status(204).end();
         return;
     }
 
     // Тестовый эндпоинт
     if (req.method === 'GET' && req.url === '/api/test') {
+        console.log('Handling /api/test GET request');
         res.status(200).json({ message: 'Сервер працює!' });
         return;
     }
 
     // Корневой маршрут
     if (req.method === 'GET' && req.url === '/') {
+        console.log('Handling root GET request');
         res.status(200).json({ message: 'Сервер працює!' });
         return;
     }
@@ -59,6 +63,8 @@ module.exports = async (req, res) => {
         res.status(405).json({ message: `Метод ${req.method} не дозволений для /api/send-order. Використовуйте POST.` });
         return;
     }
+
+    console.log('Handling /api/send-order POST request');
 
     // Обработка multipart/form-data
     const uploadMiddleware = upload.fields([
