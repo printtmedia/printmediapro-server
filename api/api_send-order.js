@@ -18,53 +18,33 @@ module.exports = async (req, res) => {
     // Добавляем CORS заголовки
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, *');
 
     // Логируем запрос
-    console.log(`Received ${req.method} request for ${req.url} from ${req.headers.origin || 'unknown origin'}`);
+    console.log(`[send-order] Received ${req.method} request for ${req.url} from ${req.headers.origin || 'unknown origin'}`);
+    console.log('[send-order] Request headers:', req.headers);
 
     // Обработка OPTIONS запросов
     if (req.method === 'OPTIONS') {
-        console.log('Handling OPTIONS request');
+        console.log('[send-order] Handling OPTIONS request');
         res.status(204).end();
-        return;
-    }
-
-    // Обработка favicon.ico и favicon.png
-    if (req.url === '/favicon.ico' || req.url === '/favicon.png') {
-        console.log('Handling favicon request');
-        res.status(204).end();
-        return;
-    }
-
-    // Тестовый эндпоинт
-    if (req.method === 'GET' && req.url === '/api/test') {
-        console.log('Handling /api/test GET request');
-        res.status(200).json({ message: 'Сервер працює!' });
-        return;
-    }
-
-    // Корневой маршрут
-    if (req.method === 'GET' && req.url === '/') {
-        console.log('Handling root GET request');
-        res.status(200).json({ message: 'Сервер працює!' });
-        return;
-    }
-
-    // Обработка /api/send-order
-    if (req.url !== '/api/send-order') {
-        console.log(`Route ${req.url} not found`);
-        res.status(404).json({ message: 'Маршрут не знайдено.' });
         return;
     }
 
     if (req.method !== 'POST') {
-        console.log(`Method ${req.method} not allowed for /api/send-order`);
+        console.log(`[send-order] Method ${req.method} not allowed for /api/send-order`);
         res.status(405).json({ message: `Метод ${req.method} не дозволений для /api/send-order. Використовуйте POST.` });
         return;
     }
 
-    console.log('Handling /api/send-order POST request');
+    console.log('[send-order] Handling /api/send-order POST request');
+
+    // Проверяем переменные окружения
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+        console.error('[send-order] Missing environment variables: EMAIL_USER or EMAIL_PASS');
+        res.status(500).json({ message: 'Помилка сервера: відсутні змінні оточення для email.' });
+        return;
+    }
 
     // Обработка multipart/form-data
     const uploadMiddleware = upload.fields([
@@ -74,31 +54,35 @@ module.exports = async (req, res) => {
 
     uploadMiddleware(req, res, async (err) => {
         if (err) {
-            console.error('Multer error:', err);
-            res.status(500).json({ message: 'Помилка при обробці файлів.' });
+            console.error('[send-order] Multer error:', err.message);
+            res.status(500).json({ message: 'Помилка при обробці файлів: ' + err.message });
             return;
         }
 
         try {
-            console.log('Received order data:', req.body);
+            console.log('[send-order] Received order data:', req.body);
             if (req.files['files']) {
-                console.log('Received files:', req.files['files'].map(file => ({
+                console.log('[send-order] Received files:', req.files['files'].map(file => ({
                     filename: file.originalname,
                     size: file.size
                 })));
+            } else {
+                console.log('[send-order] No files received');
             }
             if (req.files['orderImage']) {
-                console.log('Received order image:', {
+                console.log('[send-order] Received order image:', {
                     filename: req.files['orderImage'][0].originalname,
                     size: req.files['orderImage'][0].size
                 });
+            } else {
+                console.log('[send-order] No order image received');
             }
 
             // Отправка email
             const mailOptions = {
                 from: process.env.EMAIL_USER,
                 to: process.env.EMAIL_USER,
-                subject: `Нове замовлення №${req.body.orderNumber}`,
+                subject: `Нове замовлення №${req.body.orderNumber || 'невказано'}`,
                 text: JSON.stringify(req.body, null, 2),
                 attachments: [
                     ...(req.files['files'] || []).map(file => ({
@@ -113,12 +97,12 @@ module.exports = async (req, res) => {
             };
 
             await transporter.sendMail(mailOptions);
-            console.log('Email sent successfully');
+            console.log('[send-order] Email sent successfully');
 
             res.status(200).json({ message: 'Замовлення успішно отримано!' });
         } catch (error) {
-            console.error('Error:', error);
-            res.status(500).json({ message: 'Помилка при обробці замовлення.' });
+            console.error('[send-order] Error:', error.message);
+            res.status(500).json({ message: 'Помилка при обробці замовлення: ' + error.message });
         }
     });
 };
