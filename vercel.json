@@ -10,7 +10,7 @@
     {
       "src": "/api/test",
       "methods": ["GET"],
-      "dest": "/api/send-order.js",
+      "dest": "api/send-order.js",
       "headers": {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -20,7 +20,7 @@
     {
       "src": "/api/send-order",
       "methods": ["OPTIONS"],
-      "dest": "/api/send-order.js",
+      "dest": "api/send-order.js",
       "headers": {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -30,7 +30,16 @@
     {
       "src": "/api/send-order",
       "methods": ["POST"],
-      "dest": "/api/send-order.js",
+      "dest": "api/send-order.js",
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type"
+      }
+    },
+    {
+      "src": "/favicon\\.(ico|png)",
+      "dest": "api/send-order.js",
       "headers": {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -39,7 +48,7 @@
     },
     {
       "src": "/(.*)",
-      "dest": "/api/send-order.js",
+      "dest": "api/send-order.js",
       "headers": {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
