@@ -4,17 +4,35 @@
     {
       "src": "api/send-order.js",
       "use": "@vercel/node"
+    },
+    {
+      "src": "api/test.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/root.js",
+      "use": "@vercel/node"
     }
   ],
   "routes": [
     {
       "src": "/api/test",
       "methods": ["GET"],
-      "dest": "api/send-order.js",
+      "dest": "api/test.js",
       "headers": {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type"
+        "Access-Control-Allow-Headers": "Content-Type, *"
+      }
+    },
+    {
+      "src": "/api/test",
+      "methods": ["OPTIONS"],
+      "dest": "api/test.js",
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, *"
       }
     },
     {
@@ -24,7 +42,7 @@
       "headers": {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type"
+        "Access-Control-Allow-Headers": "Content-Type, *"
       }
     },
     {
@@ -34,25 +52,25 @@
       "headers": {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type"
+        "Access-Control-Allow-Headers": "Content-Type, *"
       }
     },
     {
       "src": "/favicon\\.(ico|png)",
-      "dest": "api/send-order.js",
+      "dest": "api/root.js",
       "headers": {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type"
+        "Access-Control-Allow-Headers": "Content-Type, *"
       }
     },
     {
       "src": "/(.*)",
-      "dest": "api/send-order.js",
+      "dest": "api/root.js",
       "headers": {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type"
+        "Access-Control-Allow-Headers": "Content-Type, *"
       }
     }
   ]
