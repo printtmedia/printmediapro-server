@@ -1,42 +1,61 @@
 const express = require('express');
 const multer = require('multer');
 const cors = require('cors');
+const nodemailer = require('nodemailer');
 
 const app = express();
 
-// Настройка хранилища для multer (временное сохранение файлов)
+// Настройка хранилища для multer
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
-// Разрешаем CORS для всех источников (или укажите конкретный домен)
+// Разрешаем CORS
 app.use(cors({
-    origin: '*', // Для тестов. В продакшене замените на 'https://printtmedia.github.io'
+    origin: 'https://printtmedia.github.io',
     methods: ['GET', 'POST', 'OPTIONS'],
-    allowedHeaders: ['Content-Type']
+    allowedHeaders: ['Content-Type'],
+    credentials: false
 }));
 
-// Парсим JSON и URL-encoded данные
+// Явно обрабатываем OPTIONS запросы
+app.options('*', cors());
+
+// Логируем все входящие запросы для отладки
+app.use((req, res, next) => {
+    console.log(`Received ${req.method} request for ${req.url}`);
+    next();
+});
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Настройка nodemailer (используем Gmail)
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+    }
+});
+
+// Тестовый эндпоинт
+app.get('/api/test', (req, res) => {
+    res.status(200).json({ message: 'Сервер працює!' });
+});
+
 // Эндпоинт для обработки заказов
 app.post('/api/send-order', upload.fields([
-    { name: 'files', maxCount: 10 }, // Поле для файлов
-    { name: 'orderImage', maxCount: 1 } // Поле для изображения заказа
-]), (req, res) => {
+    { name: 'files', maxCount: 10 },
+    { name: 'orderImage', maxCount: 1 }
+]), async (req, res) => {
     try {
-        // Логируем текстовые поля
         console.log('Received order data:', req.body);
-
-        // Логируем информацию о файлах
         if (req.files['files']) {
             console.log('Received files:', req.files['files'].map(file => ({
                 filename: file.originalname,
                 size: file.size
             })));
         }
-
-        // Логируем информацию об изображении
         if (req.files['orderImage']) {
             console.log('Received order image:', {
                 filename: req.files['orderImage'][0].originalname,
@@ -44,18 +63,37 @@ app.post('/api/send-order', upload.fields([
             });
         }
 
-        // Отправляем успешный ответ
+        // Отправка email
+        const mailOptions = {
+            from: process.env.EMAIL_USER,
+            to: process.env.EMAIL_USER,
+            subject: `Нове замовлення №${req.body.orderNumber}`,
+            text: JSON.stringify(req.body, null, 2),
+            attachments: [
+                ...(req.files['files'] || []).map(file => ({
+                    filename: file.originalname,
+                    content: file.buffer
+                })),
+                ...(req.files['orderImage'] ? [{
+                    filename: 'order.png',
+                    content: req.files['orderImage'][0].buffer
+                }] : [])
+            ]
+        };
+
+        await transporter.sendMail(mailOptions);
+        console.log('Email sent successfully');
+
         res.status(200).json({ message: 'Замовлення успішно отримано!' });
     } catch (error) {
-        console.error('Error processing order:', error);
-        res.status(500).json({ error: 'Помилка при обробці замовлення.' });
+        console.error('Error:', error);
+        res.status(500).json({ message: 'Помилка при обробці замовлення.' });
     }
 });
 
-// Тестовый эндпоинт для проверки работы сервера
-app.get('/api/test', (req, res) => {
-    res.json({ message: 'Сервер працює!' });
+// Обработка корневого маршрута
+app.get('/', (req, res) => {
+    res.status(200).json({ message: 'Сервер працює!' });
 });
 
-// Экспортируем приложение для Vercel
 module.exports = app;

@@ -8,7 +8,18 @@
   ],
   "routes": [
     {
-      "src": "/api/(.*)",
+      "src": "/api/test",
+      "methods": ["GET"],
+      "dest": "/server.js"
+    },
+    {
+      "src": "/api/send-order",
+      "methods": ["OPTIONS"],
+      "dest": "/server.js"
+    },
+    {
+      "src": "/api/send-order",
+      "methods": ["POST"],
       "dest": "/server.js"
     },
     {
