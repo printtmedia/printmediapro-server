@@ -49,11 +49,13 @@ module.exports = async (req, res) => {
 
     // Обработка /api/send-order
     if (req.url !== '/api/send-order') {
+        console.log(`Route ${req.url} not found`);
         res.status(404).json({ message: 'Маршрут не знайдено.' });
         return;
     }
 
     if (req.method !== 'POST') {
+        console.log(`Method ${req.method} not allowed for /api/send-order`);
         res.status(405).json({ message: `Метод ${req.method} не дозволений для /api/send-order. Використовуйте POST.` });
         return;
     }
