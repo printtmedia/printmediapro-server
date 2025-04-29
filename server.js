@@ -38,6 +38,11 @@ const transporter = nodemailer.createTransport({
     }
 });
 
+// Обработка favicon.ico
+app.get('/favicon.ico', (req, res) => {
+    res.status(204).end();
+});
+
 // Тестовый эндпоинт
 app.get('/api/test', (req, res) => {
     res.status(200).json({ message: 'Сервер працює!' });
