@@ -19,13 +19,15 @@ app.get('/auth/google', (req, res) => {
 
   const url = auth.generateAuthUrl({
     scope: ['https://www.googleapis.com/auth/drive.file'],
+    access_type: 'offline', // Для получения refresh_token
+    prompt: 'consent', // Запрашивает согласие пользователя
   });
 
   res.redirect(url);
 });
 
 // Маршрут для обработки callback и получения refresh token
-app.get('/auth/callback', async (req, res) => {
+app.get('/callback', async (req, res) => { // Изменил путь с /auth/callback на /callback
   const auth = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
