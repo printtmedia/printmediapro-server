@@ -57,10 +57,5 @@ app.get('/api/test', (req, res) => {
     res.json({ message: 'Сервер працює!' });
 });
 
-// Запускаем сервер (Vercel автоматически управляет портом)
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-});
-
-module.exports = app; // Экспортируем для Vercel
+// Экспортируем приложение для Vercel
+module.exports = app;
