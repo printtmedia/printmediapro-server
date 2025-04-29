@@ -27,7 +27,7 @@ app.get('/auth/google', (req, res) => {
 });
 
 // Маршрут для обработки callback и получения refresh token
-app.get('/callback', async (req, res) => { // Изменил путь с /auth/callback на /callback
+app.get('/callback', async (req, res) => {
   const auth = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
