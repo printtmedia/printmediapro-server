@@ -1,11 +1,17 @@
 const multer = require('multer');
 const nodemailer = require('nodemailer');
 
-// Настройка хранилища для multer
+// Налаштування multer з обмеженням розміру файлів (4MB для Vercel)
 const storage = multer.memoryStorage();
-const upload = multer({ storage: storage });
+const upload = multer({
+    storage: storage,
+    limits: { fileSize: 4 * 1024 * 1024 } // 4MB ліміт
+}).fields([
+    { name: 'files', maxCount: 10 },
+    { name: 'orderImage', maxCount: 1 }
+]);
 
-// Настройка nodemailer
+// Налаштування nodemailer
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
@@ -14,17 +20,11 @@ const transporter = nodemailer.createTransport({
     }
 });
 
-module.exports = async (req, res) => {
-    // Добавляем CORS заголовки
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, *');
-
+module.exports = (req, res) => {
     // Логируем запрос
     console.log(`[send-order] Received ${req.method} request for ${req.url} from ${req.headers.origin || 'unknown origin'}`);
     console.log('[send-order] Request headers:', req.headers);
 
-    // Обработка OPTIONS запросов
     if (req.method === 'OPTIONS') {
         console.log('[send-order] Handling OPTIONS request');
         res.status(204).end();
@@ -47,12 +47,7 @@ module.exports = async (req, res) => {
     }
 
     // Обработка multipart/form-data
-    const uploadMiddleware = upload.fields([
-        { name: 'files', maxCount: 10 },
-        { name: 'orderImage', maxCount: 1 }
-    ]);
-
-    uploadMiddleware(req, res, async (err) => {
+    upload(req, res, async (err) => {
         if (err) {
             console.error('[send-order] Multer error:', err.message);
             res.status(500).json({ message: 'Помилка при обробці файлів: ' + err.message });

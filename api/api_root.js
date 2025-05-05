@@ -1,9 +1,4 @@
 module.exports = async (req, res) => {
-    // Добавляем CORS заголовки
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, *');
-
     // Логируем запрос
     console.log(`[root] Received ${req.method} request for ${req.url} from ${req.headers.origin || 'unknown origin'}`);
     console.log('[root] Request headers:', req.headers);
