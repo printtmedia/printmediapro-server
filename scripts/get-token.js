@@ -19,17 +19,18 @@ const url = auth.generateAuthUrl({
 console.log('Авторизуйте додаток, відвідавши цю URL:', url);
 
 // Run this script locally and replace 'code' with the received code
-const code = 'вставте_отриманий_code_тут';
-
-if (code === 'вставте_отриманий_code_тут') {
-  console.error('Будь ласка, замініть "code" на отриманий код з URL після авторизації.');
-  process.exit(1);
-}
-
-auth.getToken(code, (err, tokens) => {
-  if (err) {
-    console.error('Помилка при отриманні токенів:', err.message);
-    return;
+(async () => {
+  const code = 'вставте_отриманий_code_тут';
+  if (code === 'вставте_отриманий_code_тут') {
+    console.error('Будь ласка, замініть "code" на отриманий код з URL після авторизації.');
+    process.exit(1);
   }
-  console.log('Refresh Token:', tokens.refresh_token);
-});
+
+  try {
+    const { tokens } = await auth.getToken(code);
+    console.log('Refresh Token:', tokens.refresh_token);
+  } catch (err) {
+    console.error('Помилка при отриманні токенів:', err.message);
+    process.exit(1);
+  }
+})();
