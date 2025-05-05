@@ -1,39 +1,20 @@
 {
   "version": 2,
-  "functions": {
-    "api/*.js": {
-      "memory": 1024,
-      "maxDuration": 30
-    }
-  },
-  "routes": [
+  "builds": [
     {
-      "src": "/api/test",
-      "methods": ["GET", "OPTIONS"],
-      "dest": "api/test.js"
-    },
-    {
-      "src": "/api/send-order",
-      "methods": ["POST", "OPTIONS"],
-      "dest": "api/send-order.js"
-    },
-    {
-      "src": "/favicon\\.(ico|png)",
-      "dest": "api/root.js"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "api/root.js"
+      "src": "api/*.js",
+      "use": "@vercel/node"
     }
   ],
-  "headers": [
+  "routes": [
     {
-      "source": "/api/(.*)",
-      "headers": [
-        { "key": "Access-Control-Allow-Origin", "value": "*" },
-        { "key": "Access-Control-Allow-Methods", "value": "GET, POST, OPTIONS" },
-        { "key": "Access-Control-Allow-Headers", "value": "Content-Type, *" }
-      ]
+      "src": "/api/(.*)",
+      "dest": "/api/$1",
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type"
+      }
     }
   ]
 }
