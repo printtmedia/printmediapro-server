@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Server for PrintMediaPro order form",
   "scripts": {
-    "start": "node api/root.js" // Для локального тестування
+    "start": "node api/root.js"
   },
   "dependencies": {
     "express": "^4.18.2",
