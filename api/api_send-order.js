@@ -4,7 +4,7 @@ const nodemailer = require('nodemailer');
 const storage = multer.memoryStorage();
 const upload = multer({
   storage: storage,
-  limits: { fileSize: 4 * 1024 * 1024 }, // 4MB limit
+  limits: { fileSize: 4 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowedTypes = [
       'application/pdf',
@@ -18,10 +18,7 @@ const upload = multer({
       cb(new Error('Непідтримуваний тип файлу'), false);
     }
   },
-}).fields([
-  { name: 'files', maxCount: 10 },
-  { name: 'orderImage', maxCount: 1 },
-]);
+}).fields([{ name: 'files', maxCount: 10 }, { name: 'orderImage', maxCount: 1 }]);
 
 module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') {
