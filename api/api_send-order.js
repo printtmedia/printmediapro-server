@@ -19,12 +19,25 @@ const upload = multer({
 ]);
 
 module.exports = async (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   upload(req, res, async (err) => {
     if (err) {
+      console.error('Помилка завантаження файлу:', err.message);
       return res.status(400).json({ message: `Помилка завантаження: ${err.message}` });
     }
 
-    // Настройка транспортера для nodemailer
+    if (!req.files || !req.files['files']) {
+      console.error('Файли не завантажені');
+      return res.status(400).json({ message: 'Файли не завантажені' });
+    }
+
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
@@ -34,16 +47,26 @@ module.exports = async (req, res) => {
     });
 
     try {
-      // Логика отправки email с данными формы и файлами
       await transporter.sendMail({
         from: 'your-email@gmail.com',
         to: 'recipient@example.com',
         subject: 'Нове замовлення від PrintMediaPro',
-        text: 'Деталі замовлення...',
-        attachments: req.files ? req.files['files'].map(file => ({ filename: file.originalname, content: file.buffer })) : []
+        text: JSON.stringify(req.body, null, 2),
+        attachments: [
+          ...req.files['files'].map(file => ({
+            filename: file.originalname,
+            content: file.buffer
+          })),
+          ...(req.files['orderImage'] ? req.files['orderImage'].map(file => ({
+            filename: 'order-image.png',
+            content: file.buffer
+          })) : [])
+        ]
       });
+      console.log('Замовлення успішно відправлено');
       res.status(200).json({ message: 'Замовлення успішно відправлено' });
     } catch (error) {
+      console.error('Помилка відправки email:', error.message);
       res.status(500).json({ message: `Помилка сервера: ${error.message}` });
     }
   });
