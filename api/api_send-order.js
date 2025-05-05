@@ -14,11 +14,22 @@ const upload = multer({
 
 module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ message: 'Метод не дозволений. Використовуйте POST.' });
+  if (req.method !== 'POST') {
+    return res.status(405).json({ message: 'Метод не дозволений. Використовуйте POST.' });
+  }
   upload(req, res, async (err) => {
-    if (err) return res.status(400).json({ message: `Помилка завантаження: ${err.message}` });
-    if (!req.files || !req.files['files']) return res.status(400).json({ message: 'Файли не завантажені' });
-    const transporter = nodemailer.createTransport({ service: 'gmail', auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS } });
+    if (err) {
+      console.error('Помилка завантаження:', err.message);
+      return res.status(400).json({ message: `Помилка завантаження: ${err.message}` });
+    }
+    if (!req.files || !req.files['files']) {
+      console.error('Файлы не загружены');
+      return res.status(400).json({ message: 'Файли не завантажені. Перевірте форму.' });
+    }
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+    });
     try {
       await transporter.sendMail({
         from: process.env.EMAIL_USER,
