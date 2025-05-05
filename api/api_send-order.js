@@ -6,23 +6,24 @@ const upload = multer({
   storage: storage,
   limits: { fileSize: 4 * 1024 * 1024 }, // 4MB limit
   fileFilter: (req, file, cb) => {
-    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    const allowedTypes = [
+      'application/pdf',
+      'image/jpeg',
+      'image/png',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ];
     if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
       cb(new Error('Непідтримуваний тип файлу'), false);
     }
-  }
+  },
 }).fields([
   { name: 'files', maxCount: 10 },
-  { name: 'orderImage', maxCount: 1 }
+  { name: 'orderImage', maxCount: 1 },
 ]);
 
 module.exports = async (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
@@ -42,26 +43,28 @@ module.exports = async (req, res) => {
       service: 'gmail',
       auth: {
         user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-      }
+        pass: process.env.EMAIL_PASS,
+      },
     });
 
     try {
       await transporter.sendMail({
-        from: 'your-email@gmail.com',
-        to: 'recipient@example.com',
+        from: process.env.EMAIL_USER,
+        to: process.env.EMAIL_TO || 'recipient@example.com', // Fallback if EMAIL_TO not set
         subject: 'Нове замовлення від PrintMediaPro',
         text: JSON.stringify(req.body, null, 2),
         attachments: [
-          ...req.files['files'].map(file => ({
+          ...req.files['files'].map((file) => ({
             filename: file.originalname,
-            content: file.buffer
+            content: file.buffer,
           })),
-          ...(req.files['orderImage'] ? req.files['orderImage'].map(file => ({
-            filename: 'order-image.png',
-            content: file.buffer
-          })) : [])
-        ]
+          ...(req.files['orderImage']
+            ? req.files['orderImage'].map((file) => ({
+                filename: 'order-image.png',
+                content: file.buffer,
+              }))
+            : []),
+        ],
       });
       console.log('Замовлення успішно відправлено');
       res.status(200).json({ message: 'Замовлення успішно відправлено' });
