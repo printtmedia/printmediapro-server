@@ -3,7 +3,9 @@ const multer = require('multer');
 const { google } = require('googleapis');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+
+// Используем только порт, заданный Render через process.env.PORT
+const PORT = process.env.PORT;
 
 // Настройка multer для обработки файлов
 const upload = multer({ storage: multer.memoryStorage() });
@@ -11,11 +13,9 @@ const upload = multer({ storage: multer.memoryStorage() });
 // Настройка Google Drive API
 const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
-  process.env.GOOGLE_CLIENT_SECRET,
-  'https://printmediapro-server.onrender.com/auth/callback' // Redirect URI
+  process.env.GOOGLE_CLIENT_SECRET
 );
 
-// Устанавливаем Refresh Token
 oauth2Client.setCredentials({
   refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
 });
@@ -24,6 +24,9 @@ const drive = google.drive({ version: 'v3', auth: oauth2Client });
 
 // Middleware для парсинга JSON
 app.use(express.json());
+
+// Middleware для парсинга form-data
+app.use(express.urlencoded({ extended: true }));
 
 // Эндпоинт для загрузки файлов
 app.post('/api/orders', upload.array('files'), async (req, res) => {
@@ -35,7 +38,6 @@ app.post('/api/orders', upload.array('files'), async (req, res) => {
       return res.status(400).json({ error: 'No files uploaded' });
     }
 
-    // Загружаем файлы в Google Drive
     const uploadedFiles = [];
     for (const file of files) {
       const driveResponse = await drive.files.create({
@@ -57,7 +59,7 @@ app.post('/api/orders', upload.array('files'), async (req, res) => {
       files: uploadedFiles,
     });
   } catch (error) {
-    console.error('Error uploading files:', error);
+    console.error('Error uploading files:', error.message);
     res.status(500).json({ error: 'Failed to upload files', details: error.message });
   }
 });
