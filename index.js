@@ -9,8 +9,8 @@ const app = express();
 
 const PORT = process.env.PORT || 10000;
 
-// Configure multer to handle both files and fields
-const upload = multer({ storage: multer.memoryStorage() });
+// Configure multer to handle all fields, including files
+const upload = multer({ storage: multer.memoryStorage() }).any();
 
 app.use(cors({
   origin: 'https://printtmedia.github.io',
@@ -32,7 +32,7 @@ oauth2Client.setCredentials({
 
 const drive = google.drive({ version: 'v3', auth: oauth2Client });
 
-app.post('/api/send-order', upload.array('files'), async (req, res) => {
+app.post('/api/send-order', upload, async (req, res) => {
   try {
     const formData = req.body;
     const files = req.files || [];
@@ -40,7 +40,7 @@ app.post('/api/send-order', upload.array('files'), async (req, res) => {
     const uploadedFiles = [];
     const fileLinks = [];
 
-    // Handle file uploads
+    // Handle file uploads (including orderImage)
     for (const file of files) {
       const decodedFileName = iconv.decode(Buffer.from(file.originalname, 'binary'), 'utf8');
       const bufferStream = new Readable();
@@ -79,7 +79,7 @@ app.post('/api/send-order', upload.array('files'), async (req, res) => {
       }
     }
 
-    // Prepare email notification (simplified for this example)
+    // Prepare email notification (placeholder)
     console.log('Email notification to printtmedia27@gmail.com:', {
       subject: `New Order #${formData.orderNumber || 'Unknown'}`,
       body: `Order received:\n${JSON.stringify(formData, null, 2)}\n\nDownload links for large files:\n${fileLinks.join('\n')}`,
