@@ -1,4 +1,8 @@
 {
+  "name": "printmediapro-server",
+  "version": "1.0.0",
+  "description": "Server for PrintMediaProDrive",
+  "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
