@@ -1,16 +1,14 @@
 const express = require('express');
 const multer = require('multer');
 const { google } = require('googleapis');
+const { Readable } = require('stream'); // Add this to create a stream from Buffer
 
 const app = express();
 
-// Используем только порт, заданный Render через process.env.PORT
 const PORT = process.env.PORT;
 
-// Настройка multer для обработки файлов
 const upload = multer({ storage: multer.memoryStorage() });
 
-// Настройка Google Drive API
 const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
   process.env.GOOGLE_CLIENT_SECRET
@@ -22,13 +20,9 @@ oauth2Client.setCredentials({
 
 const drive = google.drive({ version: 'v3', auth: oauth2Client });
 
-// Middleware для парсинга JSON
 app.use(express.json());
-
-// Middleware для парсинга form-data
 app.use(express.urlencoded({ extended: true }));
 
-// Эндпоинт для загрузки файлов
 app.post('/api/orders', upload.array('files'), async (req, res) => {
   try {
     const { name, email, details } = req.body;
@@ -40,14 +34,19 @@ app.post('/api/orders', upload.array('files'), async (req, res) => {
 
     const uploadedFiles = [];
     for (const file of files) {
+      // Convert Buffer to Readable stream
+      const bufferStream = new Readable();
+      bufferStream.push(file.buffer);
+      bufferStream.push(null); // Signal the end of the stream
+
       const driveResponse = await drive.files.create({
         requestBody: {
           name: file.originalname,
-          parents: [process.env.GOOGLE_DRIVE_FOLDER_ID], // Папка в Google Drive
+          parents: [process.env.GOOGLE_DRIVE_FOLDER_ID],
         },
         media: {
           mimeType: file.mimetype,
-          body: file.buffer,
+          body: bufferStream, // Use the stream instead of file.buffer
         },
       });
       uploadedFiles.push(driveResponse.data);
@@ -64,7 +63,6 @@ app.post('/api/orders', upload.array('files'), async (req, res) => {
   }
 });
 
-// Запуск сервера
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
