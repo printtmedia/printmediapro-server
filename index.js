@@ -12,10 +12,12 @@ const PORT = process.env.PORT || 10000;
 // Configure multer to handle all fields, including files
 const upload = multer({ storage: multer.memoryStorage() }).any();
 
+// Enhanced CORS configuration
 app.use(cors({
   origin: 'https://printtmedia.github.io',
   methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type']
+  allowedHeaders: ['Content-Type', 'Accept'],
+  optionsSuccessStatus: 200 // Some legacy browsers choke on 204
 }));
 
 app.use(express.json());
