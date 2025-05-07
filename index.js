@@ -4,6 +4,7 @@ const { google } = require('googleapis');
 const { Readable } = require('stream');
 const cors = require('cors');
 const iconv = require('iconv-lite');
+const nodemailer = require('nodemailer'); // Added nodemailer
 
 const app = express();
 
@@ -23,6 +24,7 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Configure Google Drive API
 const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
   process.env.GOOGLE_CLIENT_SECRET
@@ -33,6 +35,15 @@ oauth2Client.setCredentials({
 });
 
 const drive = google.drive({ version: 'v3', auth: oauth2Client });
+
+// Configure Nodemailer for Gmail SMTP
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER, // Your Gmail address (e.g., printtmedia27@gmail.com)
+    pass: process.env.EMAIL_PASS, // Your Gmail App Password (not regular password)
+  },
+});
 
 app.post('/api/send-order', upload, async (req, res) => {
   try {
@@ -81,18 +92,25 @@ app.post('/api/send-order', upload, async (req, res) => {
       }
     }
 
-    // Prepare email notification (placeholder)
-    console.log('Email notification to printtmedia27@gmail.com:', {
+    // Prepare and send email notification
+    const mailOptions = {
+      from: process.env.EMAIL_USER, // Sender email
+      to: 'printtmedia27@gmail.com', // Recipient email
       subject: `New Order #${formData.orderNumber || 'Unknown'}`,
-      body: `Order received:\n${JSON.stringify(formData, null, 2)}\n\nDownload links for large files:\n${fileLinks.join('\n')}`,
-      attachments: files.filter(file => file.size / (1024 * 1024) <= 25).map(file => ({
-        filename: iconv.decode(Buffer.from(file.originalname, 'binary'), 'utf8'),
-        content: file.buffer,
-      })),
-    });
+      text: `Order received:\n${JSON.stringify(formData, null, 2)}\n\nDownload links for large files:\n${fileLinks.join('\n') || 'None'}`,
+      attachments: files
+        .filter(file => file.size / (1024 * 1024) <= 25)
+        .map(file => ({
+          filename: iconv.decode(Buffer.from(file.originalname, 'binary'), 'utf8'),
+          content: file.buffer,
+        })),
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log('Email sent successfully to printtmedia27@gmail.com');
 
     res.status(200).json({
-      message: 'Order created and files processed successfully',
+      message: 'Order created, files processed, and email sent successfully',
       order: formData,
       fileLinks: fileLinks,
     });
