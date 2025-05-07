@@ -55,7 +55,7 @@ app.post('/api/send-order', upload, async (req, res) => {
 
     console.log('Starting file processing...');
     console.log('Form data:', formData);
-    console.log('Files received:', files.map(f => ({ name: f.originalname, size: f.size })));
+    console.log('Files received:', files.map(f => ({ name: f.originalname, size: f.size, fieldName: f.fieldname })));
 
     // Handle file uploads (including orderImage)
     for (const file of files) {
