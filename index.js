@@ -53,6 +53,10 @@ app.post('/api/send-order', upload, async (req, res) => {
     const uploadedFiles = [];
     const fileLinks = [];
 
+    console.log('Starting file processing...');
+    console.log('Form data:', formData);
+    console.log('Files received:', files.map(f => ({ name: f.originalname, size: f.size })));
+
     // Handle file uploads (including orderImage)
     for (const file of files) {
       const decodedFileName = iconv.decode(Buffer.from(file.originalname, 'binary'), 'utf8');
@@ -97,7 +101,8 @@ app.post('/api/send-order', upload, async (req, res) => {
           console.log(`Google Drive link generated: ${fileLink}`);
         } catch (driveError) {
           console.error(`Failed to upload ${decodedFileName} to Google Drive:`, driveError.message);
-          throw driveError; // Re-throw to be caught by the outer try-catch
+          console.error('Stack trace:', driveError.stack);
+          throw driveError;
         }
       } else {
         console.log(`File ${decodedFileName} is under threshold, will be attached to email.`);
@@ -129,6 +134,7 @@ app.post('/api/send-order', upload, async (req, res) => {
     });
   } catch (error) {
     console.error('Error processing order:', error.message);
+    console.error('Full error details:', error);
     res.status(500).json({ error: 'Failed to process order', details: error.message });
   }
 });
