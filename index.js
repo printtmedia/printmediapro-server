@@ -4,7 +4,7 @@ const { google } = require('googleapis');
 const { Readable } = require('stream');
 const cors = require('cors');
 const iconv = require('iconv-lite');
-const nodemailer = require('nodemailer'); // Added nodemailer
+const nodemailer = require('nodemailer');
 
 const app = express();
 
@@ -18,7 +18,7 @@ app.use(cors({
   origin: 'https://printtmedia.github.io',
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Accept'],
-  optionsSuccessStatus: 200 // Some legacy browsers choke on 204
+  optionsSuccessStatus: 200
 }));
 
 app.use(express.json());
@@ -40,8 +40,8 @@ const drive = google.drive({ version: 'v3', auth: oauth2Client });
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: process.env.EMAIL_USER, // Your Gmail address (e.g., printtmedia27@gmail.com)
-    pass: process.env.EMAIL_PASS, // Your Gmail App Password (not regular password)
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
   },
 });
 
@@ -61,45 +61,58 @@ app.post('/api/send-order', upload, async (req, res) => {
       bufferStream.push(null);
 
       const fileSizeMB = file.size / (1024 * 1024);
-      const shouldUploadToDrive = fileSizeMB > 25;
+      console.log(`Processing file: ${decodedFileName}, Size: ${fileSizeMB.toFixed(2)}MB`);
+
+      // Lowered threshold to 1MB for testing
+      const shouldUploadToDrive = fileSizeMB > 1;
 
       if (shouldUploadToDrive) {
-        const driveResponse = await drive.files.create({
-          requestBody: {
-            name: decodedFileName,
-            parents: [process.env.GOOGLE_DRIVE_FOLDER_ID],
-          },
-          media: {
-            mimeType: file.mimetype,
-            body: bufferStream,
-          },
-        });
+        console.log(`Uploading ${decodedFileName} to Google Drive...`);
+        try {
+          const driveResponse = await drive.files.create({
+            requestBody: {
+              name: decodedFileName,
+              parents: [process.env.GOOGLE_DRIVE_FOLDER_ID],
+            },
+            media: {
+              mimeType: file.mimetype,
+              body: bufferStream,
+            },
+          });
 
-        const fileId = driveResponse.data.id;
-        await drive.permissions.create({
-          fileId: fileId,
-          requestBody: {
-            role: 'reader',
-            type: 'anyone',
-          },
-        });
+          const fileId = driveResponse.data.id;
+          console.log(`File uploaded to Google Drive, ID: ${fileId}`);
 
-        const fileLink = `https://drive.google.com/uc?export=download&id=${fileId}`;
-        fileLinks.push(fileLink);
-        uploadedFiles.push(driveResponse.data);
+          await drive.permissions.create({
+            fileId: fileId,
+            requestBody: {
+              role: 'reader',
+              type: 'anyone',
+            },
+          });
+
+          const fileLink = `https://drive.google.com/uc?export=download&id=${fileId}`;
+          fileLinks.push(fileLink);
+          uploadedFiles.push(driveResponse.data);
+          console.log(`Google Drive link generated: ${fileLink}`);
+        } catch (driveError) {
+          console.error(`Failed to upload ${decodedFileName} to Google Drive:`, driveError.message);
+          throw driveError; // Re-throw to be caught by the outer try-catch
+        }
       } else {
+        console.log(`File ${decodedFileName} is under threshold, will be attached to email.`);
         uploadedFiles.push({ name: decodedFileName, size: file.size });
       }
     }
 
     // Prepare and send email notification
     const mailOptions = {
-      from: process.env.EMAIL_USER, // Sender email
-      to: 'printtmedia27@gmail.com', // Recipient email
+      from: process.env.EMAIL_USER,
+      to: 'printtmedia27@gmail.com',
       subject: `New Order #${formData.orderNumber || 'Unknown'}`,
       text: `Order received:\n${JSON.stringify(formData, null, 2)}\n\nDownload links for large files:\n${fileLinks.join('\n') || 'None'}`,
       attachments: files
-        .filter(file => file.size / (1024 * 1024) <= 25)
+        .filter(file => file.size / (1024 * 1024) <= 1)
         .map(file => ({
           filename: iconv.decode(Buffer.from(file.originalname, 'binary'), 'utf8'),
           content: file.buffer,
