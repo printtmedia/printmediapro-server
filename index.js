@@ -65,6 +65,15 @@ app.post('/api/send-order', upload, async (req, res) => {
     console.log('Form data:', formData);
     console.log('Files received:', files.map(f => ({ name: f.originalname, size: f.size, fieldName: f.fieldname, path: f.path })));
 
+    // Validate received files against formData.filename
+    const expectedFiles = formData.filename ? formData.filename.split(', ').filter(name => name && name !== 'Не вказано') : [];
+    const receivedFileNames = files.map(f => f.originalname);
+    const missingFiles = expectedFiles.filter(name => !receivedFileNames.includes(name));
+    if (missingFiles.length > 0) {
+      console.warn('Missing files:', missingFiles);
+      formData.missingFiles = missingFiles.join(', '); // Add to formData for email notification
+    }
+
     // Handle file uploads (including orderImage)
     for (const file of files) {
       const decodedFileName = iconv.decode(Buffer.from(file.originalname, 'binary'), 'utf8');
