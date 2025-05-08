@@ -119,7 +119,7 @@ app.post('/api/send-order', upload, async (req, res) => {
           formData.uploadErrors = formData.uploadErrors || [];
           formData.uploadErrors.push(`Failed to upload ${decodedFileName}: ${driveError.message}`);
         } finally {
-          fs.unlik(file.path, (err) => {
+          fs.unlink(file.path, (err) => {
             if (err) console.error(`Failed to delete temporary file ${file.path}:`, err);
           });
         }
@@ -129,10 +129,10 @@ app.post('/api/send-order', upload, async (req, res) => {
       }
     }
 
-    // Prepare and send email notification
+    // Prepare and send email notification to both email addresses
     const mailOptions = {
       from: process.env.EMAIL_USER,
-      to: 'printtmedia27@gmail.com',
+      to: 'printtmedia27@gmail.com, printmediapro@gmail.com', // Send to both emails
       subject: `New Order #${formData.orderNumber || 'Unknown'}`,
       text: `Order received:\n${JSON.stringify(formData, null, 2)}\n\nDownload links for large files:\n${fileLinks.join('\n') || 'None'}${formData.missingFiles ? `\n\nWarning: The following files were not received by the server: ${formData.missingFiles}` : ''}${formData.uploadErrors ? `\n\nUpload Errors: ${formData.uploadErrors.join('\n')}` : ''}`,
       attachments: files
@@ -144,7 +144,7 @@ app.post('/api/send-order', upload, async (req, res) => {
     };
 
     await transporter.sendMail(mailOptions);
-    console.log('Email sent successfully to printtmedia27@gmail.com');
+    console.log('Email sent successfully to printtmedia27@gmail.com and printmediapro@gmail.com');
 
     res.status(200).json({
       message: 'Order created, files processed, and email sent successfully',
