@@ -115,9 +115,11 @@ app.post('/api/send-order', upload, async (req, res) => {
         } catch (driveError) {
           console.error(`Failed to upload ${decodedFileName} to Google Drive:`, driveError.message);
           console.error('Error details:', driveError.response?.data || driveError);
-          throw driveError;
+          // Continue processing despite the upload failure
+          formData.uploadErrors = formData.uploadErrors || [];
+          formData.uploadErrors.push(`Failed to upload ${decodedFileName}: ${driveError.message}`);
         } finally {
-          fs.unlink(file.path, (err) => {
+          fs.unlik(file.path, (err) => {
             if (err) console.error(`Failed to delete temporary file ${file.path}:`, err);
           });
         }
@@ -132,7 +134,7 @@ app.post('/api/send-order', upload, async (req, res) => {
       from: process.env.EMAIL_USER,
       to: 'printtmedia27@gmail.com',
       subject: `New Order #${formData.orderNumber || 'Unknown'}`,
-      text: `Order received:\n${JSON.stringify(formData, null, 2)}\n\nDownload links for large files:\n${fileLinks.join('\n') || 'None'}`,
+      text: `Order received:\n${JSON.stringify(formData, null, 2)}\n\nDownload links for large files:\n${fileLinks.join('\n') || 'None'}${formData.missingFiles ? `\n\nWarning: The following files were not received by the server: ${formData.missingFiles}` : ''}${formData.uploadErrors ? `\n\nUpload Errors: ${formData.uploadErrors.join('\n')}` : ''}`,
       attachments: files
         .filter(file => file.size / (1024 * 1024) <= 1)
         .map(file => ({
