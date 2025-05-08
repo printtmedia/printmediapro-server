@@ -1,7 +1,7 @@
 const express = require('express');
 const multer = require('multer');
 const { google } = require('googleapis');
-const { Readable } = require('stream');
+const fs = require('fs');
 const cors = require('cors');
 const iconv = require('iconv-lite');
 const nodemailer = require('nodemailer');
@@ -10,8 +10,16 @@ const app = express();
 
 const PORT = process.env.PORT || 10000;
 
-// Configure multer to handle all fields, including files
-const upload = multer({ storage: multer.memoryStorage() }).any();
+// Configure multer with disk storage
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, '/tmp'); // Use temporary directory
+  },
+  filename: (req, file, cb) => {
+    cb(null, `${Date.now()}-${file.originalname}`);
+  }
+});
+const upload = multer({ storage: storage }).any();
 
 // Enhanced CORS configuration
 app.use(cors({
@@ -55,24 +63,20 @@ app.post('/api/send-order', upload, async (req, res) => {
 
     console.log('Starting file processing...');
     console.log('Form data:', formData);
-    console.log('Files received:', files.map(f => ({ name: f.originalname, size: f.size, fieldName: f.fieldname })));
+    console.log('Files received:', files.map(f => ({ name: f.originalname, size: f.size, fieldName: f.fieldname, path: f.path })));
 
     // Handle file uploads (including orderImage)
     for (const file of files) {
       const decodedFileName = iconv.decode(Buffer.from(file.originalname, 'binary'), 'utf8');
-      const bufferStream = new Readable();
-      bufferStream.push(file.buffer);
-      bufferStream.push(null);
-
       const fileSizeMB = file.size / (1024 * 1024);
       console.log(`Processing file: ${decodedFileName}, Size: ${fileSizeMB.toFixed(2)}MB`);
 
-      // Lowered threshold to 1MB for testing
       const shouldUploadToDrive = fileSizeMB > 1;
 
       if (shouldUploadToDrive) {
         console.log(`Uploading ${decodedFileName} to Google Drive...`);
         try {
+          const fileStream = fs.createReadStream(file.path);
           const driveResponse = await drive.files.create({
             requestBody: {
               name: decodedFileName,
@@ -80,7 +84,7 @@ app.post('/api/send-order', upload, async (req, res) => {
             },
             media: {
               mimeType: file.mimetype,
-              body: bufferStream,
+              body: fileStream,
             },
           });
 
@@ -101,12 +105,16 @@ app.post('/api/send-order', upload, async (req, res) => {
           console.log(`Google Drive link generated: ${fileLink}`);
         } catch (driveError) {
           console.error(`Failed to upload ${decodedFileName} to Google Drive:`, driveError.message);
-          console.error('Stack trace:', driveError.stack);
+          console.error('Error details:', driveError.response?.data || driveError);
           throw driveError;
+        } finally {
+          fs.unlink(file.path, (err) => {
+            if (err) console.error(`Failed to delete temporary file ${file.path}:`, err);
+          });
         }
       } else {
         console.log(`File ${decodedFileName} is under threshold, will be attached to email.`);
-        uploadedFiles.push({ name: decodedFileName, size: file.size });
+        uploadedFiles.push({ name: decodedFileName, size: file.size, path: file.path });
       }
     }
 
@@ -120,7 +128,7 @@ app.post('/api/send-order', upload, async (req, res) => {
         .filter(file => file.size / (1024 * 1024) <= 1)
         .map(file => ({
           filename: iconv.decode(Buffer.from(file.originalname, 'binary'), 'utf8'),
-          content: file.buffer,
+          path: file.path,
         })),
     };
 
