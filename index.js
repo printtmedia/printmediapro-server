@@ -1,7 +1,7 @@
 const express = require('express');
 const multer = require('multer');
 const { google } = require('googleapis');
-const fs = require('fs');
+const { Readable } = require('stream');
 const cors = require('cors');
 const iconv = require('iconv-lite');
 const nodemailer = require('nodemailer');
@@ -10,16 +10,17 @@ const app = express();
 
 const PORT = process.env.PORT || 10000;
 
-// Configure multer with disk storage
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, '/tmp'); // Use temporary directory
-  },
-  filename: (req, file, cb) => {
-    cb(null, `${Date.now()}-${file.originalname}`);
-  }
+// Увеличим таймаут сервера для обработки больших файлов
+app.server = app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
-const upload = multer({ storage: storage }).any();
+app.server.setTimeout(10 * 60 * 1000); // 10 минут
+
+// Настройка multer с хранением в памяти и лимитом в 2 ГБ
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 2 * 1024 * 1024 * 1024 }, // 2 ГБ
+}).any();
 
 // Enhanced CORS configuration
 app.use(cors({
@@ -29,8 +30,8 @@ app.use(cors({
   optionsSuccessStatus: 200
 }));
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '2gb' }));
+app.use(express.urlencoded({ extended: true, limit: '2gb' }));
 
 // Configure Google Drive API
 const oauth2Client = new google.auth.OAuth2(
@@ -53,6 +54,9 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+// Увеличим таймаут для nodemailer
+transporter.options.poolTimeout = 10 * 60 * 1000; // 10 минут
+
 app.post('/api/send-order', upload, async (req, res) => {
   try {
     const formData = req.body;
@@ -63,7 +67,7 @@ app.post('/api/send-order', upload, async (req, res) => {
 
     console.log('Starting file processing...');
     console.log('Form data:', formData);
-    console.log('Files received:', files.map(f => ({ name: f.originalname, size: f.size, fieldName: f.fieldname, path: f.path })));
+    console.log('Files received:', files.map(f => ({ name: f.originalname, size: f.size, fieldName: f.fieldname })));
 
     // Validate received files against formData.filename
     const expectedFiles = formData.filename ? formData.filename.split(', ').filter(name => name && name !== 'Не вказано') : [];
@@ -71,7 +75,7 @@ app.post('/api/send-order', upload, async (req, res) => {
     const missingFiles = expectedFiles.filter(name => !receivedFileNames.includes(name));
     if (missingFiles.length > 0) {
       console.warn('Missing files:', missingFiles);
-      formData.missingFiles = missingFiles.join(', '); // Add to formData for email notification
+      formData.missingFiles = missingFiles.join(', ');
     }
 
     // Handle file uploads (including orderImage)
@@ -85,7 +89,8 @@ app.post('/api/send-order', upload, async (req, res) => {
       if (shouldUploadToDrive) {
         console.log(`Uploading ${decodedFileName} to Google Drive...`);
         try {
-          const fileStream = fs.createReadStream(file.path);
+          // Загружаем файл из памяти через поток
+          const fileStream = Readable.from(file.buffer);
           const driveResponse = await drive.files.create({
             requestBody: {
               name: decodedFileName,
@@ -115,31 +120,26 @@ app.post('/api/send-order', upload, async (req, res) => {
         } catch (driveError) {
           console.error(`Failed to upload ${decodedFileName} to Google Drive:`, driveError.message);
           console.error('Error details:', driveError.response?.data || driveError);
-          // Continue processing despite the upload failure
           formData.uploadErrors = formData.uploadErrors || [];
           formData.uploadErrors.push(`Failed to upload ${decodedFileName}: ${driveError.message}`);
-        } finally {
-          fs.unlink(file.path, (err) => {
-            if (err) console.error(`Failed to delete temporary file ${file.path}:`, err);
-          });
         }
       } else {
         console.log(`File ${decodedFileName} is under threshold, will be attached to email.`);
-        uploadedFiles.push({ name: decodedFileName, size: file.size, path: file.path });
+        uploadedFiles.push({ name: decodedFileName, size: file.size, buffer: file.buffer });
       }
     }
 
     // Prepare and send email notification to both email addresses
     const mailOptions = {
       from: process.env.EMAIL_USER,
-      to: 'printtmedia27@gmail.com, printmediapro@gmail.com', // Send to both emails
+      to: 'printtmedia27@gmail.com, printmediapro@gmail.com',
       subject: `New Order #${formData.orderNumber || 'Unknown'}`,
       text: `Order received:\n${JSON.stringify(formData, null, 2)}\n\nDownload links for large files:\n${fileLinks.join('\n') || 'None'}${formData.missingFiles ? `\n\nWarning: The following files were not received by the server: ${formData.missingFiles}` : ''}${formData.uploadErrors ? `\n\nUpload Errors: ${formData.uploadErrors.join('\n')}` : ''}`,
       attachments: files
         .filter(file => file.size / (1024 * 1024) <= 1)
         .map(file => ({
           filename: iconv.decode(Buffer.from(file.originalname, 'binary'), 'utf8'),
-          path: file.path,
+          content: file.buffer,
         })),
     };
 
@@ -156,8 +156,4 @@ app.post('/api/send-order', upload, async (req, res) => {
     console.error('Full error details:', error);
     res.status(500).json({ error: 'Failed to process order', details: error.message });
   }
-});
-
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
 });
