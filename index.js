@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const multer = require('multer');
 const { google } = require('googleapis');
@@ -33,17 +34,21 @@ app.use(cors({
 app.use(express.json({ limit: '2gb' }));
 app.use(express.urlencoded({ extended: true, limit: '2gb' }));
 
-// Configure Google Drive API
+// Configure Google Drive API with automatic token refresh
 const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
-  process.env.GOOGLE_CLIENT_SECRET
+  process.env.GOOGLE_CLIENT_SECRET,
+  'http://localhost' // Замените на реальный redirect URI, если требуется
 );
 
 oauth2Client.setCredentials({
   refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
 });
 
-const drive = google.drive({ version: 'v3', auth: oauth2Client });
+const drive = google.drive({
+  version: 'v3',
+  auth: oauth2Client, // OAuth2 client автоматически обновляет access_token
+});
 
 // Configure Nodemailer for Gmail SMTP
 const transporter = nodemailer.createTransport({
