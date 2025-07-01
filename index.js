@@ -62,6 +62,20 @@ oauth2Client.on('tokens', (tokens) => {
   console.log('New access_token:', tokens.access_token);
 });
 
+// Перевірка автентифікації перед запуском
+async function verifyAuth() {
+  try {
+    const token = await oauth2Client.getAccessToken();
+    if (!token.token) {
+      throw new Error('Failed to obtain access token during initialization');
+    }
+    console.log('OAuth2 authentication successful');
+  } catch (error) {
+    console.error('OAuth2 authentication failed:', error.message);
+  }
+}
+verifyAuth();
+
 const drive = google.drive({
   version: 'v3',
   auth: oauth2Client,
