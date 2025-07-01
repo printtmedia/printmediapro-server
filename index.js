@@ -21,13 +21,13 @@ app.server.setTimeout(10 * 60 * 1000); // 10 хвилин
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 2 * 1024 * 1024 * 1024 }, // 2 ГБ
-}).any();
+}).array('orderImage'); // Використовуємо array замість any для чіткої обробки orderImage
 
 // Покращена конфігурація CORS з явною обробкою OPTIONS
 app.use(cors({
   origin: (origin, callback) => {
     console.log('CORS origin:', origin);
-    if (origin === 'https://printtmedia.github.io' || !origin) {
+    if (!origin || origin === 'https://printtmedia.github.io') {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
@@ -37,8 +37,9 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Accept'],
   optionsSuccessStatus: 200
 }));
-app.options('/api/send-order', cors()); // Явна обробка OPTIONS
+app.options('/api/send-order', cors());
 
+// Парсинг JSON і URL-encoded даних
 app.use(express.json({ limit: '2gb' }));
 app.use(express.urlencoded({ extended: true, limit: '2gb' }));
 
@@ -46,18 +47,17 @@ app.use(express.urlencoded({ extended: true, limit: '2gb' }));
 const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
   process.env.GOOGLE_CLIENT_SECRET,
-  'https://printmediapro-server.onrender.com/oauth2callback' // Оновлений redirect_uri
+  'https://printmediapro-server.onrender.com/oauth2callback'
 );
 
 oauth2Client.setCredentials({
   refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
 });
 
-// Автоматичне оновлення access_token
+// Логування оновлення токенів
 oauth2Client.on('tokens', (tokens) => {
   if (tokens.refresh_token) {
     console.log('New refresh_token:', tokens.refresh_token);
-    // Збережіть новий refresh_token у змінних оточення, якщо потрібно
   }
   console.log('New access_token:', tokens.access_token);
 });
@@ -80,9 +80,31 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-// Налаштування таймауту для Nodemailer
 transporter.options = { poolTimeout: 10 * 60 * 1000 }; // 10 хвилин
 
+// Тестовий маршрут для перевірки Google Drive
+app.get('/test-drive', async (req, res) => {
+  try {
+    const fileStream = require('fs').createReadStream('test.pdf');
+    const driveResponse = await drive.files.create({
+      requestBody: {
+        name: 'test.pdf',
+        parents: [process.env.GOOGLE_DRIVE_FOLDER_ID || 'root'],
+      },
+      media: {
+        mimeType: 'application/pdf',
+        body: fileStream,
+      },
+      fields: 'id, webViewLink'
+    });
+    res.json({ message: 'File uploaded', data: driveResponse.data });
+  } catch (error) {
+    console.error('Test drive error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Основний маршрут для обробки замовлень
 app.post('/api/send-order', upload, async (req, res) => {
   try {
     const formData = req.body;
