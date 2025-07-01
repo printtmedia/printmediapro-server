@@ -17,13 +17,13 @@ app.server = app.listen(PORT, () => {
 });
 app.server.setTimeout(10 * 60 * 1000); // 10 хвилин
 
-// Налаштування Multer для зберігання файлів у пам'яті з лімітом 2 ГБ
+// Налаштування Multer для обробки файлів orderImage
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 2 * 1024 * 1024 * 1024 }, // 2 ГБ
-}).array('orderImage'); // Використовуємо array замість any для чіткої обробки orderImage
+}).array('orderImage');
 
-// Покращена конфігурація CORS з явною обробкою OPTIONS
+// Покращена конфігурація CORS
 app.use(cors({
   origin: (origin, callback) => {
     console.log('CORS origin:', origin);
@@ -76,13 +76,19 @@ const transporter = nodemailer.createTransport({
     clientId: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
     refreshToken: process.env.GOOGLE_REFRESH_TOKEN,
-    accessToken: async () => (await oauth2Client.getAccessToken()).token
+    accessToken: async () => {
+      const token = await oauth2Client.getAccessToken();
+      if (!token.token) {
+        throw new Error('Failed to obtain access token');
+      }
+      return token.token;
+    }
   }
 });
 
 transporter.options = { poolTimeout: 10 * 60 * 1000 }; // 10 хвилин
 
-// Тестовий маршрут для перевірки Google Drive
+// Тестовий маршрут для Google Drive
 app.get('/test-drive', async (req, res) => {
   try {
     const fileStream = require('fs').createReadStream('test.pdf');
@@ -104,6 +110,22 @@ app.get('/test-drive', async (req, res) => {
   }
 });
 
+// Тестовий маршрут для Email
+app.get('/test-email', async (req, res) => {
+  try {
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: 'printtmedia27@gmail.com',
+      subject: 'Test Email',
+      text: 'This is a test email'
+    });
+    res.json({ message: 'Email sent' });
+  } catch (error) {
+    console.error('Test email error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Основний маршрут для обробки замовлень
 app.post('/api/send-order', upload, async (req, res) => {
   try {
@@ -118,10 +140,10 @@ app.post('/api/send-order', upload, async (req, res) => {
     console.log('Files received:', files.map(f => ({ name: f.originalname, size: f.size, fieldName: f.fieldname })));
 
     // Валідація отриманих файлів проти formData.filename
-    const expectedFiles = Array.isArray(formData.filename) 
+    const expectedFiles = Array.isArray(formData.filename)
       ? formData.filename.filter(name => name && name !== 'Не вказано')
       : formData.filename ? [formData.filename].filter(name => name && name !== 'Не вказано') : [];
-    const receivedFileNames = files.map(f => f.originalname);
+    const receivedFileNames = files.map(f => iconv.decode(Buffer.from(f.originalname, 'binary'), 'utf8'));
     const missingFiles = expectedFiles.filter(name => !receivedFileNames.includes(name));
     if (missingFiles.length > 0) {
       console.warn('Missing files:', missingFiles);
