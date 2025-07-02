@@ -97,7 +97,9 @@ const transporter = nodemailer.createTransport({
       }
       return token.token;
     }
-  }
+  },
+  logger: true, // Додано для детального логування
+  debug: true   // Додано для дебагу
 });
 
 transporter.options = { poolTimeout: 10 * 60 * 1000 }; // 10 хвилин
@@ -229,11 +231,17 @@ app.post('/api/send-order', upload, async (req, res) => {
         })),
     };
 
-    await transporter.sendMail(mailOptions);
-    console.log('Email sent successfully to printtmedia27@gmail.com and printmediapro@gmail.com');
+    try {
+      await transporter.sendMail(mailOptions);
+      console.log('Email sent successfully to printtmedia27@gmail.com and printmediapro@gmail.com');
+    } catch (emailError) {
+      console.error('Email sending failed:', emailError.message);
+      console.error('Email error details:', emailError);
+      formData.emailError = emailError.message;
+    }
 
     res.status(200).json({
-      message: 'Order created, files processed, and email sent successfully',
+      message: 'Order created, files processed' + (formData.emailError ? ', but email failed' : ', and email sent successfully'),
       order: formData,
       fileLinks: fileLinks,
     });
