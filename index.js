@@ -11,138 +11,57 @@ const app = express();
 
 const PORT = process.env.PORT || 10000;
 
-// Налаштування сервера з таймаутом для великих файлів
+// Увеличим таймаут сервера для обработки больших файлов
 app.server = app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
-app.server.setTimeout(10 * 60 * 1000); // 10 хвилин
+app.server.setTimeout(10 * 60 * 1000); // 10 минут
 
-// Налаштування Multer для обробки файлів orderImage
+// Настройка multer с хранением в памяти и лимитом в 2 ГБ
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 2 * 1024 * 1024 * 1024 }, // 2 ГБ
-}).array('orderImage');
+}).any();
 
-// Покращена конфігурація CORS
+// Enhanced CORS configuration
 app.use(cors({
-  origin: (origin, callback) => {
-    console.log('CORS origin:', origin);
-    if (!origin || origin === 'https://printtmedia.github.io') {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+  origin: 'https://printtmedia.github.io',
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Accept'],
   optionsSuccessStatus: 200
 }));
-app.options('/api/send-order', cors());
 
-// Парсинг JSON і URL-encoded даних
 app.use(express.json({ limit: '2gb' }));
 app.use(express.urlencoded({ extended: true, limit: '2gb' }));
 
-// Налаштування Google Drive API та Gmail API з OAuth 2.0
+// Configure Google Drive API with automatic token refresh
 const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
   process.env.GOOGLE_CLIENT_SECRET,
-  'https://printmediapro-server.onrender.com/oauth2callback'
+  'http://localhost' // Замените на реальный redirect URI, если требуется
 );
 
 oauth2Client.setCredentials({
   refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
 });
 
-// Логування оновлення токенів
-oauth2Client.on('tokens', (tokens) => {
-  if (tokens.refresh_token) {
-    console.log('New refresh_token:', tokens.refresh_token);
-  }
-  console.log('New access_token:', tokens.access_token);
-});
-
-// Перевірка автентифікації перед запуском
-async function verifyAuth() {
-  try {
-    const token = await oauth2Client.getAccessToken();
-    if (!token.token) {
-      throw new Error('Failed to obtain access token during initialization');
-    }
-    console.log('OAuth2 authentication successful');
-  } catch (error) {
-    console.error('OAuth2 authentication failed:', error.message);
-  }
-}
-verifyAuth();
-
 const drive = google.drive({
   version: 'v3',
-  auth: oauth2Client,
+  auth: oauth2Client, // OAuth2 client автоматически обновляет access_token
 });
 
-// Налаштування Nodemailer для Gmail з OAuth 2.0
+// Configure Nodemailer for Gmail SMTP
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    type: 'OAuth2',
     user: process.env.EMAIL_USER,
-    clientId: process.env.GOOGLE_CLIENT_ID,
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    refreshToken: process.env.GOOGLE_REFRESH_TOKEN,
-    accessToken: async () => {
-      const token = await oauth2Client.getAccessToken();
-      if (!token.token) {
-        throw new Error('Failed to obtain access token');
-      }
-      return token.token;
-    }
+    pass: process.env.EMAIL_PASS,
   },
-  logger: true, // Додано для детального логування
-  debug: true   // Додано для дебагу
 });
 
-transporter.options = { poolTimeout: 10 * 60 * 1000 }; // 10 хвилин
+// Увеличим таймаут для nodemailer
+transporter.options.poolTimeout = 10 * 60 * 1000; // 10 минут
 
-// Тестовий маршрут для Google Drive
-app.get('/test-drive', async (req, res) => {
-  try {
-    const fileStream = require('fs').createReadStream('test.pdf');
-    const driveResponse = await drive.files.create({
-      requestBody: {
-        name: 'test.pdf',
-        parents: [process.env.GOOGLE_DRIVE_FOLDER_ID || 'root'],
-      },
-      media: {
-        mimeType: 'application/pdf',
-        body: fileStream,
-      },
-      fields: 'id, webViewLink'
-    });
-    res.json({ message: 'File uploaded', data: driveResponse.data });
-  } catch (error) {
-    console.error('Test drive error:', error.message);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Тестовий маршрут для Email
-app.get('/test-email', async (req, res) => {
-  try {
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
-      to: 'printtmedia27@gmail.com',
-      subject: 'Test Email',
-      text: 'This is a test email'
-    });
-    res.json({ message: 'Email sent' });
-  } catch (error) {
-    console.error('Test email error:', error.message);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Основний маршрут для обробки замовлень
 app.post('/api/send-order', upload, async (req, res) => {
   try {
     const formData = req.body;
@@ -155,18 +74,16 @@ app.post('/api/send-order', upload, async (req, res) => {
     console.log('Form data:', formData);
     console.log('Files received:', files.map(f => ({ name: f.originalname, size: f.size, fieldName: f.fieldname })));
 
-    // Валідація отриманих файлів проти formData.filename
-    const expectedFiles = Array.isArray(formData.filename)
-      ? formData.filename.filter(name => name && name !== 'Не вказано')
-      : formData.filename ? [formData.filename].filter(name => name && name !== 'Не вказано') : [];
-    const receivedFileNames = files.map(f => iconv.decode(Buffer.from(f.originalname, 'binary'), 'utf8'));
+    // Validate received files against formData.filename
+    const expectedFiles = formData.filename ? formData.filename.split(', ').filter(name => name && name !== 'Не вказано') : [];
+    const receivedFileNames = files.map(f => f.originalname);
     const missingFiles = expectedFiles.filter(name => !receivedFileNames.includes(name));
     if (missingFiles.length > 0) {
       console.warn('Missing files:', missingFiles);
       formData.missingFiles = missingFiles.join(', ');
     }
 
-    // Обробка завантаження файлів
+    // Handle file uploads (including orderImage)
     for (const file of files) {
       const decodedFileName = iconv.decode(Buffer.from(file.originalname, 'binary'), 'utf8');
       const fileSizeMB = file.size / (1024 * 1024);
@@ -177,17 +94,17 @@ app.post('/api/send-order', upload, async (req, res) => {
       if (shouldUploadToDrive) {
         console.log(`Uploading ${decodedFileName} to Google Drive...`);
         try {
+          // Загружаем файл из памяти через поток
           const fileStream = Readable.from(file.buffer);
           const driveResponse = await drive.files.create({
             requestBody: {
               name: decodedFileName,
-              parents: [process.env.GOOGLE_DRIVE_FOLDER_ID || 'root'],
+              parents: [process.env.GOOGLE_DRIVE_FOLDER_ID],
             },
             media: {
               mimeType: file.mimetype,
               body: fileStream,
             },
-            fields: 'id, webViewLink'
           });
 
           const fileId = driveResponse.data.id;
@@ -201,7 +118,7 @@ app.post('/api/send-order', upload, async (req, res) => {
             },
           });
 
-          const fileLink = `https://drive.google.com/file/d/${fileId}/view`;
+          const fileLink = `https://drive.google.com/uc?export=download&id=${fileId}`;
           fileLinks.push(fileLink);
           uploadedFiles.push(driveResponse.data);
           console.log(`Google Drive link generated: ${fileLink}`);
@@ -217,10 +134,10 @@ app.post('/api/send-order', upload, async (req, res) => {
       }
     }
 
-    // Підготовка та відправка email
+    // Prepare and send email notification to both email addresses
     const mailOptions = {
       from: process.env.EMAIL_USER,
-      to: ['printtmedia27@gmail.com', 'printmediapro@gmail.com'],
+      to: 'printtmedia27@gmail.com, printmediapro@gmail.com',
       subject: `New Order #${formData.orderNumber || 'Unknown'}`,
       text: `Order received:\n${JSON.stringify(formData, null, 2)}\n\nDownload links for large files:\n${fileLinks.join('\n') || 'None'}${formData.missingFiles ? `\n\nWarning: The following files were not received by the server: ${formData.missingFiles}` : ''}${formData.uploadErrors ? `\n\nUpload Errors: ${formData.uploadErrors.join('\n')}` : ''}`,
       attachments: files
@@ -231,17 +148,11 @@ app.post('/api/send-order', upload, async (req, res) => {
         })),
     };
 
-    try {
-      await transporter.sendMail(mailOptions);
-      console.log('Email sent successfully to printtmedia27@gmail.com and printmediapro@gmail.com');
-    } catch (emailError) {
-      console.error('Email sending failed:', emailError.message);
-      console.error('Email error details:', emailError);
-      formData.emailError = emailError.message;
-    }
+    await transporter.sendMail(mailOptions);
+    console.log('Email sent successfully to printtmedia27@gmail.com and printmediapro@gmail.com');
 
     res.status(200).json({
-      message: 'Order created, files processed' + (formData.emailError ? ', but email failed' : ', and email sent successfully'),
+      message: 'Order created, files processed, and email sent successfully',
       order: formData,
       fileLinks: fileLinks,
     });
